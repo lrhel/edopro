@@ -68,7 +68,16 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 				mainGame->device->closeDevice();
 				break;
 			}
+			case BUTTON_ONLINE_MODE: {
+				mainGame->is_online_hosting = true;
+				mainGame->btnOnlineCreateHost->setEnabled(true);
+				mainGame->btnOnlineJoinCancel->setEnabled(true);
+				mainGame->HideElement(mainGame->wMainMenu);
+				mainGame->ShowElement(mainGame->wOnlineWindow);
+				break;
+			}
 			case BUTTON_LAN_MODE: {
+				mainGame->is_online_hosting = false;
 				mainGame->btnCreateHost->setEnabled(mainGame->coreloaded);
 				mainGame->btnJoinHost->setEnabled(true);
 				mainGame->btnJoinCancel->setEnabled(true);
@@ -77,42 +86,32 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 				break;
 			}
 			case BUTTON_JOIN_HOST: {
-				char ip[20];
-				const wchar_t* pstr = mainGame->ebJoinHost->getText();
-				BufferIO::CopyWStr(pstr, ip, 16);
-				unsigned int remote_addr = htonl(inet_addr(ip));
+				unsigned int remote_addr = -1;
+				unsigned int remote_port = -1;
+				std::wstring server = mainGame->ebJoinHost->getText();
+				remote_port = std::stoi(mainGame->ebJoinPort->getText());
+				remote_addr = DuelClient::ResolveServer(server, mainGame->ebJoinPort->getText());
 				if(remote_addr == -1) {
-					char hostname[100];
-					char port[6];
-					BufferIO::CopyWStr(pstr, hostname, 100);
-					BufferIO::CopyWStr(mainGame->ebJoinPort->getText(), port, 6);
-					struct evutil_addrinfo hints;
-					struct evutil_addrinfo *answer = NULL;
-					memset(&hints, 0, sizeof(hints));
-					hints.ai_family = AF_INET;
-					hints.ai_socktype = SOCK_STREAM;
-					hints.ai_protocol = IPPROTO_TCP;
-					hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
-					int status = evutil_getaddrinfo(hostname, port, &hints, &answer);
-					if(status != 0) {
-						mainGame->gMutex.lock();
-						mainGame->env->addMessageBox(L"", dataManager.GetSysString(1412).c_str());
-						mainGame->gMutex.unlock();
-						break;
-					} else {
-						sockaddr_in * sin = ((struct sockaddr_in *)answer->ai_addr);
-						evutil_inet_ntop(AF_INET, &(sin->sin_addr), ip, 20);
-						remote_addr = htonl(inet_addr(ip));
-					}
+					mainGame->gMutex.lock();
+					mainGame->env->addMessageBox(L"", dataManager.GetSysString(1412).c_str());
+					mainGame->gMutex.unlock();
+					break;
 				}
-				unsigned int remote_port = std::stoi(mainGame->ebJoinPort->getText());
-				mainGame->gameConf.lasthost = pstr;
+				mainGame->gameConf.lasthost = server;
 				mainGame->gameConf.lastport = mainGame->ebJoinPort->getText();
-				if(DuelClient::StartClient(remote_addr, remote_port, false)) {
+				if(DuelClient::ConnectToServer(remote_addr, remote_port, true)) {
 					mainGame->btnCreateHost->setEnabled(false);
 					mainGame->btnJoinHost->setEnabled(false);
 					mainGame->btnJoinCancel->setEnabled(false);
 				}
+				break;
+			}
+			case BUTTON_ONLINE_JOIN_CANCEL: {
+				//DuelClient::StopClient();
+				mainGame->HideElement(mainGame->wOnlineWindow);
+				mainGame->ShowElement(mainGame->wMainMenu);
+				if(exit_on_return)
+					mainGame->device->closeDevice();
 				break;
 			}
 			case BUTTON_JOIN_CANCEL: {
@@ -126,10 +125,43 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 				DuelClient::BeginRefreshHost();
 				break;
 			}
+			case BUTTON_ONLINE_REFRESH: {
+				std::wstring server(mainGame->ebJoinServer->getText());
+				std::wstring port(mainGame->ebJoinServerPort->getText());
+				if(server.size() && port.size()) {
+					unsigned int remote_addr = DuelClient::ResolveServer(server, port);
+					if(remote_addr != -1) {
+						if(DuelClient::ConnectToServer(remote_addr, std::stoi(port))) {
+							mainGame->btnOnlineRefresh->setEnabled(false);
+							DuelClient::BeginRefreshHost();
+						}
+					}
+				}
+				break;
+			}
+			/*case BUTTON_SERVER_CONNECT: {
+				std::wstring server(mainGame->ebJoinServer->getText());
+				std::wstring port(mainGame->ebJoinServerPort->getText());
+				if(server.size() && port.size()) {
+					unsigned int remote_addr = DuelClient::ResolveServer(server, port);
+					if(remote_addr != -1) {
+						mainGame->btnServerConnect->setEnabled(false);
+						DuelClient::ConnectToServer(remote_addr, std::stoi(port));
+					}
+				}
+				break;
+			}*/
 			case BUTTON_CREATE_HOST: {
 				mainGame->btnHostConfirm->setEnabled(true);
 				mainGame->btnHostCancel->setEnabled(true);
 				mainGame->HideElement(mainGame->wLanWindow);
+				mainGame->ShowElement(mainGame->wCreateHost);
+				break;
+			}
+			case BUTTON_ONLINE_CREATE_HOST: {
+				mainGame->btnHostConfirm->setEnabled(true);
+				mainGame->btnHostCancel->setEnabled(true);
+				mainGame->HideElement(mainGame->wOnlineWindow);
 				mainGame->ShowElement(mainGame->wCreateHost);
 				break;
 			}
@@ -185,9 +217,25 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 				unsigned int host_port = std::stoi(mainGame->ebHostPort->getText());
 				mainGame->gameConf.gamename = mainGame->ebServerName->getText();
 				mainGame->gameConf.serverport = mainGame->ebHostPort->getText();
+				if(mainGame->is_online_hosting) {
+					std::wstring server(mainGame->ebJoinServer->getText());
+					std::wstring port(mainGame->ebJoinServerPort->getText());
+					if(server.size() && port.size()) {
+						unsigned int remote_addr = DuelClient::ResolveServer(server, port);
+						mainGame->btnHostConfirm->setEnabled(false);
+						if(remote_addr != -1) {
+							if(!DuelClient::ConnectToServer(remote_addr, std::stoi(port), true, true)) {
+								mainGame->btnHostConfirm->setEnabled(true);
+								NetServer::StopServer();
+								break;
+							}
+						}
+					}
+					break;
+				}
 				if(!NetServer::StartServer(host_port))
 					break;
-				if(!DuelClient::StartClient(0x7f000001, host_port)) {
+				if(!DuelClient::ConnectToServer(0x7f000001, host_port, true, true)) {
 					NetServer::StopServer();
 					break;
 				}
@@ -196,13 +244,19 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 				break;
 			}
 			case BUTTON_HOST_CANCEL: {
-				mainGame->btnCreateHost->setEnabled(mainGame->coreloaded);
-				mainGame->btnJoinHost->setEnabled(true);
-				mainGame->btnJoinCancel->setEnabled(true);
 				if(mainGame->wRules->isVisible())
 					mainGame->HideElement(mainGame->wRules);
 				mainGame->HideElement(mainGame->wCreateHost);
-				mainGame->ShowElement(mainGame->wLanWindow);
+				if(!mainGame->is_online_hosting) {
+					mainGame->btnCreateHost->setEnabled(mainGame->coreloaded);
+					mainGame->btnJoinHost->setEnabled(true);
+					mainGame->btnJoinCancel->setEnabled(true);
+					mainGame->ShowElement(mainGame->wLanWindow);
+				} else {
+					mainGame->btnOnlineCreateHost->setEnabled(true);
+					mainGame->btnOnlineJoinCancel->setEnabled(true);
+					mainGame->ShowElement(mainGame->wOnlineWindow);
+				}
 				break;
 			}
 			case BUTTON_HP_DUELIST: {
@@ -256,13 +310,18 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 			}
 			case BUTTON_HP_CANCEL: {
 				DuelClient::StopClient();
-				mainGame->btnCreateHost->setEnabled(mainGame->coreloaded);
-				mainGame->btnJoinHost->setEnabled(true);
-				mainGame->btnJoinCancel->setEnabled(true);
+				if(mainGame->is_online_hosting) {
+					mainGame->btnCreateHost->setEnabled(mainGame->coreloaded);
+					mainGame->btnJoinHost->setEnabled(true);
+					mainGame->btnJoinCancel->setEnabled(true);
+				}
 				mainGame->HideElement(mainGame->wHostPrepare);
 				if(mainGame->wHostPrepare2->isVisible())
 					mainGame->HideElement(mainGame->wHostPrepare2);
-				mainGame->ShowElement(mainGame->wLanWindow);
+				if(mainGame->is_online_hosting)
+					mainGame->ShowElement(mainGame->wOnlineWindow);
+				else
+					mainGame->ShowElement(mainGame->wLanWindow);
 				mainGame->wChat->setVisible(false);
 				if(exit_on_return)
 					mainGame->device->closeDevice();
@@ -508,38 +567,45 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 		case irr::gui::EGET_LISTBOX_SELECTED_AGAIN: {
 			switch(id) {
 			case LISTBOX_LAN_HOST: {
-				char ip[20];
-				const wchar_t* pstr = mainGame->ebJoinHost->getText();
-				BufferIO::CopyWStr(pstr, ip, 16);
-				unsigned int remote_addr = htonl(inet_addr(ip));
+				unsigned int remote_addr = DuelClient::ResolveServer(mainGame->ebJoinHost->getText(), mainGame->ebJoinPort->getText());
 				if(remote_addr == -1) {
-					char hostname[100];
-					char port[6];
-					BufferIO::CopyWStr(pstr, hostname, 100);
-					BufferIO::CopyWStr(mainGame->ebJoinPort->getText(), port, 6);
-					struct evutil_addrinfo hints;
-					struct evutil_addrinfo *answer = NULL;
-					memset(&hints, 0, sizeof(hints));
-					hints.ai_family = AF_INET;
-					hints.ai_socktype = SOCK_STREAM;
-					hints.ai_protocol = IPPROTO_TCP;
-					hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
-					int status = evutil_getaddrinfo(hostname, port, &hints, &answer);
-					if(status != 0) {
-						mainGame->gMutex.lock();
-						mainGame->env->addMessageBox(L"", dataManager.GetSysString(1412).c_str());
-						mainGame->gMutex.unlock();
-						break;
-					} else {
-						sockaddr_in * sin = ((struct sockaddr_in *)answer->ai_addr);
-						evutil_inet_ntop(AF_INET, &(sin->sin_addr), ip, 20);
-						remote_addr = htonl(inet_addr(ip));
-					}
+					mainGame->gMutex.lock();
+					mainGame->env->addMessageBox(L"", dataManager.GetSysString(1412).c_str());
+					mainGame->gMutex.unlock();
+					break;
 				}
 				unsigned int remote_port = std::stoi(mainGame->ebJoinPort->getText());
-				mainGame->gameConf.lasthost = pstr;
+				mainGame->gameConf.lasthost = mainGame->ebJoinHost->getText();
 				mainGame->gameConf.lastport = mainGame->ebJoinPort->getText();
-				if(DuelClient::StartClient(remote_addr, remote_port, false)) {
+				if(DuelClient::ConnectToServer(remote_addr, remote_port, true)) {
+					mainGame->btnCreateHost->setEnabled(false);
+					mainGame->btnJoinHost->setEnabled(false);
+					mainGame->btnJoinCancel->setEnabled(false);
+				}
+				break;
+			}
+			case LISTBOX_ONLINE_HOST: {
+				int sel = mainGame->lstOnlineHostList->getSelected();
+				if(sel == -1)
+					break;
+				std::wstring server(mainGame->ebJoinServer->getText());
+				std::wstring port(mainGame->ebJoinServerPort->getText());
+				if(!server.size() && !port.size()) {
+					break;
+				}
+				unsigned int remote_addr = DuelClient::ResolveServer(server, port);
+				if(remote_addr == -1) {
+					mainGame->gMutex.lock();
+					mainGame->env->addMessageBox(L"", dataManager.GetSysString(1412).c_str());
+					mainGame->gMutex.unlock();
+					break;
+				}
+				int gameid = DuelClient::hosts[sel].identifier;
+				mainGame->gameConf.lastserver = server;
+				mainGame->gameConf.lastserverport = port;
+				unsigned int remote_port = std::stoi(port);
+				BufferIO::CopyWStr(std::to_wstring(gameid).c_str(), DuelClient::room_id, 20);
+				if(DuelClient::ConnectToServer(remote_addr, remote_port, true)) {
 					mainGame->btnCreateHost->setEnabled(false);
 					mainGame->btnJoinHost->setEnabled(false);
 					mainGame->btnJoinCancel->setEnabled(false);

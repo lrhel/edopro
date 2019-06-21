@@ -102,6 +102,33 @@ struct STOC_HS_PlayerChange {
 struct STOC_HS_WatchChange {
 	unsigned short watch_count;
 };
+struct STOC_ServerInfo {
+	unsigned short identifier;
+	unsigned short version;
+	struct duel_info {
+		int duel_id;
+		bool is_started;
+		unsigned short name[20];
+		HostInfo info;
+	};
+	std::vector<duel_info> hosts;
+	std::vector<uint8> ToRaw(const std::vector<duel_info>& hosts) {
+		std::vector<uint8> raw;
+		BufferIO::insert_value(raw, identifier);
+		BufferIO::insert_value(raw, version);
+		BufferIO::insert_value<uint32>(raw, hosts.size());
+		for(auto& host : hosts) {
+			BufferIO::insert_value<duel_info>(raw, host);
+		}
+		return raw;
+	}
+	void FromRaw(char* buf) {
+		identifier = BufferIO::Read<unsigned short>(buf);
+		version = BufferIO::Read<unsigned short>(buf);
+		int count = BufferIO::Read<uint32>(buf);
+		hosts.insert(hosts.end(), (duel_info*)buf, (duel_info*)buf + count);
+	}
+};
 
 class DuelMode;
 
@@ -184,6 +211,7 @@ public:
 #define CTOS_HS_NOTREADY	0x23
 #define CTOS_HS_KICK		0x24
 #define CTOS_HS_START		0x25
+#define CTOS_REQUEST_INFO	0x26
 
 #define STOC_GAME_MSG		0x1
 #define STOC_ERROR_MSG		0x2
@@ -207,6 +235,8 @@ public:
 #define STOC_HS_WATCH_CHANGE	0x22
 
 #define STOC_CATCHUP		0xf0
+#define STOC_SERVER_INFO	0xf1
+
 
 #define STOC_NEW_REPLAY			0x30
 

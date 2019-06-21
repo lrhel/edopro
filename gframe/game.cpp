@@ -150,15 +150,42 @@ bool Game::Initialize() {
 	mTopMenu = irr::gui::CGUICustomMenu::addCustomMenu(env);
 	mRepositoriesInfo = mTopMenu->getSubMenu(mTopMenu->addItem(dataManager.GetSysString(2045).c_str(), 1, true, true));
 	//main menu
-	wMainMenu = env->addWindow(rect<s32>(370, 200, 650, 415), false, fmt::format(L"EDOPro Version:{:X}.0{:X}.{:X}", PRO_VERSION >> 12, (PRO_VERSION >> 4) & 0xff, PRO_VERSION & 0xf).c_str());
+	wMainMenu = env->addWindow(rect<s32>(370, 200, 650, 450), false, fmt::format(L"EDOPro Version:{:X}.0{:X}.{:X}", PRO_VERSION >> 12, (PRO_VERSION >> 4) & 0xff, PRO_VERSION & 0xf).c_str());
 	wMainMenu->getCloseButton()->setVisible(false);
-	btnLanMode = env->addButton(rect<s32>(10, 30, 270, 60), wMainMenu, BUTTON_LAN_MODE, dataManager.GetSysString(1200).c_str());
-	btnSingleMode = env->addButton(rect<s32>(10, 65, 270, 95), wMainMenu, BUTTON_SINGLE_MODE, dataManager.GetSysString(1201).c_str());
-	btnReplayMode = env->addButton(rect<s32>(10, 100, 270, 130), wMainMenu, BUTTON_REPLAY_MODE, dataManager.GetSysString(1202).c_str());
-//	btnTestMode = env->addButton(rect<s32>(10, 135, 270, 165), wMainMenu, BUTTON_TEST_MODE, dataManager.GetSysString(1203).c_str());
-	btnDeckEdit = env->addButton(rect<s32>(10, 135, 270, 165), wMainMenu, BUTTON_DECK_EDIT, dataManager.GetSysString(1204).c_str());
-	btnModeExit = env->addButton(rect<s32>(10, 170, 270, 200), wMainMenu, BUTTON_MODE_EXIT, dataManager.GetSysString(1210).c_str());
+	btnOnlineMode = env->addButton(rect<s32>(10, 30, 270, 60), wMainMenu, BUTTON_ONLINE_MODE, dataManager.GetSysString(1200).c_str());
+	btnLanMode = env->addButton(rect<s32>(10, 65, 270, 95), wMainMenu, BUTTON_LAN_MODE, dataManager.GetSysString(1200).c_str());
+	btnSingleMode = env->addButton(rect<s32>(10, 100, 270, 130), wMainMenu, BUTTON_SINGLE_MODE, dataManager.GetSysString(1201).c_str());
+	btnReplayMode = env->addButton(rect<s32>(10, 135, 270, 165), wMainMenu, BUTTON_REPLAY_MODE, dataManager.GetSysString(1202).c_str());
+//	btnTestMode = env->addButton(rect<s32>(10, 170, 270, 200), wMainMenu, BUTTON_TEST_MODE, dataManager.GetSysString(1203).c_str());
+	btnDeckEdit = env->addButton(rect<s32>(10, 170, 270, 200), wMainMenu, BUTTON_DECK_EDIT, dataManager.GetSysString(1204).c_str());
+	btnModeExit = env->addButton(rect<s32>(10, 205, 270, 235), wMainMenu, BUTTON_MODE_EXIT, dataManager.GetSysString(1210).c_str());
 	btnSingleMode->setEnabled(coreloaded);
+
+
+	//online mode
+	wOnlineWindow = env->addWindow(rect<s32>(220, 100, 800, 520), false, dataManager.GetSysString(1200).c_str());
+	wOnlineWindow->getCloseButton()->setVisible(false);
+	wOnlineWindow->setVisible(false);
+	env->addStaticText(dataManager.GetSysString(1220).c_str(), rect<s32>(10, 30, 220, 50), false, false, wOnlineWindow);
+	ebOnlineNickName = env->addEditBox(gameConf.nickname.c_str(), rect<s32>(110, 25, 450, 50), true, wOnlineWindow);
+	ebOnlineNickName->setTextAlignment(irr::gui::EGUIA_UPPERLEFT, irr::gui::EGUIA_CENTER);
+	lstOnlineHostList = env->addListBox(rect<s32>(10, 60, 570, 320), wOnlineWindow, LISTBOX_ONLINE_HOST, true);
+	lstOnlineHostList->setItemHeight(18);
+	btnOnlineRefresh = env->addButton(rect<s32>(240, 325, 340, 350), wOnlineWindow, BUTTON_ONLINE_REFRESH, dataManager.GetSysString(1217).c_str());
+
+	//btnServerConnect = env->addButton(rect<s32>(350, 325, 450, 350), wOnlineWindow, BUTTON_SERVER_CONNECT, dataManager.GetSysString(1217).c_str());
+
+	env->addStaticText(dataManager.GetSysString(1221).c_str(), rect<s32>(10, 360, 220, 380), false, false, wOnlineWindow);
+
+	ebJoinServer = env->addEditBox(gameConf.lasthost.c_str(), rect<s32>(110, 355, 350, 380), true, wOnlineWindow);
+	ebJoinServer->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
+	ebJoinServerPort = env->addEditBox(gameConf.lastport.c_str(), rect<s32>(360, 355, 420, 380), true, wOnlineWindow, EDITBOX_PORT_BOX);
+	ebJoinServerPort->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
+
+	btnOnlineJoinCancel = env->addButton(rect<s32>(460, 385, 570, 410), wOnlineWindow, BUTTON_ONLINE_JOIN_CANCEL, dataManager.GetSysString(1212).c_str());
+	btnOnlineCreateHost = env->addButton(rect<s32>(460, 25, 570, 50), wOnlineWindow, BUTTON_ONLINE_CREATE_HOST, dataManager.GetSysString(1224).c_str());
+	
+
 	//lan mode
 	wLanWindow = env->addWindow(rect<s32>(220, 100, 800, 520), false, dataManager.GetSysString(1200).c_str());
 	wLanWindow->getCloseButton()->setVisible(false);
@@ -169,7 +196,16 @@ bool Game::Initialize() {
 	lstHostList = env->addListBox(rect<s32>(10, 60, 570, 320), wLanWindow, LISTBOX_LAN_HOST, true);
 	lstHostList->setItemHeight(18);
 	btnLanRefresh = env->addButton(rect<s32>(240, 325, 340, 350), wLanWindow, BUTTON_LAN_REFRESH, dataManager.GetSysString(1217).c_str());
+
+	//btnServerConnect = env->addButton(rect<s32>(350, 325, 450, 350), wLanWindow, BUTTON_SERVER_CONNECT, dataManager.GetSysString(1217).c_str());
+
 	env->addStaticText(dataManager.GetSysString(1221).c_str(), rect<s32>(10, 360, 220, 380), false, false, wLanWindow);
+
+	/*ebJoinServer = env->addEditBox(gameConf.lastserver.c_str(), rect<s32>(10, 325, 180, 350), true, wLanWindow);
+	ebJoinServer->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
+	ebJoinServerPort = env->addEditBox(gameConf.lastserverport.c_str(), rect<s32>(170, 325, 230, 350), true, wLanWindow);
+	ebJoinServerPort->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);*/
+
 	ebJoinHost = env->addEditBox(gameConf.lasthost.c_str(), rect<s32>(110, 355, 350, 380), true, wLanWindow);
 	ebJoinHost->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
 	ebJoinPort = env->addEditBox(gameConf.lastport.c_str(), rect<s32>(360, 355, 420, 380), true, wLanWindow, EDITBOX_PORT_BOX);
@@ -984,7 +1020,7 @@ void Game::MainLoop() {
 		}
 		if (DuelClient::try_needed) {
 			DuelClient::try_needed = false;
-			DuelClient::StartClient(DuelClient::temp_ip, DuelClient::temp_port, false);
+			DuelClient::ConnectToServer(DuelClient::temp_ip, DuelClient::temp_port, true);
 		}
 		popupCheck.lock();
 		if(queued_msg.size()){
@@ -1101,6 +1137,8 @@ void Game::LoadConfig() {
 	gameConf.lastdeck = L"";
 	gameConf.numfont = L"";
 	gameConf.textfont = L"";
+	gameConf.lastserver = L"";
+	gameConf.lastserverport = L"";
 	gameConf.lasthost = L"";
 	gameConf.lastport = L"";
 	gameConf.roompass = L"";
@@ -1169,6 +1207,10 @@ void Game::LoadConfig() {
 			gameConf.numfont = BufferIO::DecodeUTF8s(str);
 		else if(type == "serverport")
 			gameConf.serverport = BufferIO::DecodeUTF8s(str);
+		else if(type == "lastserver")
+			gameConf.lastserver = BufferIO::DecodeUTF8s(str);
+		else if(type == "lastserverport")
+			gameConf.lastserverport = BufferIO::DecodeUTF8s(str);
 		else if(type == "lasthost")
 			gameConf.lasthost = BufferIO::DecodeUTF8s(str);
 		else if(type == "lastport")
@@ -1239,6 +1281,8 @@ void Game::SaveConfig() {
 	conf_file << "textfont = "			<< BufferIO::EncodeUTF8s(gameConf.textfont) << " " << std::to_string(gameConf.textfontsize) << "\n";
 	conf_file << "numfont = "			<< BufferIO::EncodeUTF8s(gameConf.numfont) << "\n";
 	conf_file << "serverport = "		<< BufferIO::EncodeUTF8s(gameConf.serverport) << "\n";
+	conf_file << "lastserver = "		<< BufferIO::EncodeUTF8s(gameConf.lastserver) << "\n";
+	conf_file << "lastserverport = "	<< BufferIO::EncodeUTF8s(gameConf.lastserverport) << "\n";
 	conf_file << "lasthost = "			<< BufferIO::EncodeUTF8s(gameConf.lasthost) << "\n";
 	conf_file << "lastport = "			<< BufferIO::EncodeUTF8s(gameConf.lastport) << "\n";
 	conf_file << "game_version = "		<< std::to_string(gameConf.game_version) << "\n";
@@ -1781,7 +1825,7 @@ void Game::SetMesageWindow() {
 	}
 }
 void Game::OnResize() {
-	wMainMenu->setRelativePosition(ResizeWin(370, 200, 650, 415));
+	wMainMenu->setRelativePosition(ResizeWin(370, 200, 650, 450));
 	SetCentered(wCommitsLog);
 	wDeckEdit->setRelativePosition(Resize(309, 8, 605, 130));
 	cbDBLFList->setRelativePosition(Resize(80, 5, 220, 30));
@@ -1832,6 +1876,7 @@ void Game::OnResize() {
 	btnSideReload->setRelativePosition(Resize(440, 100, 500, 130));
 	btnDeleteDeck->setRelativePosition(Resize(225, 95, 290, 120));
 
+	wOnlineWindow->setRelativePosition(ResizeWin(220, 100, 800, 520));
 	wLanWindow->setRelativePosition(ResizeWin(220, 100, 800, 520));
 	wCreateHost->setRelativePosition(ResizeWin(320, 100, 700, 520));
 	if (dInfo.isRelay) {

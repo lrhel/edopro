@@ -28,6 +28,8 @@ struct Config {
 	unsigned short antialias;
 	std::wstring serverport;
 	unsigned char textfontsize;
+	std::wstring lastserver;
+	std::wstring lastserverport;
 	std::wstring lasthost;
 	std::wstring lastport;
 	std::wstring nickname;
@@ -228,6 +230,7 @@ public:
 	int showcardcode;
 	float showcarddif;
 	float showcardp;
+	bool is_online_hosting;
 	bool is_attacking;
 	float attack_sv;
 	irr::core::vector3df atk_r;
@@ -316,6 +319,7 @@ public:
 	irr::gui::IGUIWindow* wCommitsLog;
 	irr::gui::IGUIContextMenu* mTopMenu;
 	irr::gui::IGUIContextMenu* mRepositoriesInfo;
+	irr::gui::IGUIButton* btnOnlineMode;
 	irr::gui::IGUIButton* btnLanMode;
 	irr::gui::IGUIButton* btnSingleMode;
 	irr::gui::IGUIButton* btnReplayMode;
@@ -324,11 +328,24 @@ public:
 	irr::gui::IGUIButton* btnModeExit;
 	irr::gui::IGUIButton* btnCommitLogExit;
 	irr::gui::IGUIStaticText* stCommitLog;
+	//online
+	irr::gui::IGUIWindow* wOnlineWindow;
+	irr::gui::IGUIEditBox* ebOnlineNickName;
+	irr::gui::IGUIListBox* lstOnlineHostList;
+	irr::gui::IGUIButton* btnOnlineRefresh;
+	//irr::gui::IGUIButton* btnServerConnect;
+	irr::gui::IGUIEditBox* ebJoinServer;
+	irr::gui::IGUIEditBox* ebJoinServerPort;
+	irr::gui::IGUIButton* btnOnlineJoinCancel;
+	irr::gui::IGUIButton* btnOnlineCreateHost;
 	//lan
 	irr::gui::IGUIWindow* wLanWindow;
 	irr::gui::IGUIEditBox* ebNickName;
 	irr::gui::IGUIListBox* lstHostList;
 	irr::gui::IGUIButton* btnLanRefresh;
+	//irr::gui::IGUIButton* btnServerConnect;
+	//irr::gui::IGUIEditBox* ebJoinServer;
+	//irr::gui::IGUIEditBox* ebJoinServerPort;
 	irr::gui::IGUIEditBox* ebJoinHost;
 	irr::gui::IGUIEditBox* ebJoinPort;
 	irr::gui::IGUIEditBox* ebJoinPass;
@@ -614,6 +631,7 @@ inline std::vector<T> Game::TokenizeString(T input, const T & token) {
 #define BUTTON_TEST_MODE			103
 #define BUTTON_DECK_EDIT			104
 #define BUTTON_MODE_EXIT			105
+#define BUTTON_ONLINE_MODE			106
 #define LISTBOX_LAN_HOST			110
 #define BUTTON_JOIN_HOST			111
 #define BUTTON_JOIN_CANCEL			112
@@ -755,6 +773,11 @@ inline std::vector<T> Game::TokenizeString(T input, const T & token) {
 #define CHECKBOX_PZONE				393
 #define CHECKBOX_SEPARATE_PZONE		394
 #define CHECKBOX_EMZONE				395
+
+#define LISTBOX_ONLINE_HOST			500
+#define BUTTON_ONLINE_REFRESH		501
+#define BUTTON_ONLINE_JOIN_CANCEL	502
+#define BUTTON_ONLINE_CREATE_HOST	503
 
 #define DEFAULT_DUEL_RULE			4
 

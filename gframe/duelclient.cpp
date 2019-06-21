@@ -39,8 +39,9 @@ unsigned int DuelClient::temp_ip = 0;
 unsigned short DuelClient::temp_port = 0;
 unsigned short DuelClient::temp_ver = 0;
 bool DuelClient::try_needed = false;
+unsigned short DuelClient::room_id[20];
 
-bool DuelClient::StartClient(unsigned int ip, unsigned short port, bool create_game) {
+bool DuelClient::ConnectToServer(unsigned int ip, unsigned short port, bool start_client, bool create_duel) {
 	if(connect_state)
 		return false;
 	sockaddr_in sin;
@@ -52,10 +53,11 @@ bool DuelClient::StartClient(unsigned int ip, unsigned short port, bool create_g
 	sin.sin_addr.s_addr = htonl(ip);
 	sin.sin_port = htons(port);
 	client_bev = bufferevent_socket_new(client_base, -1, BEV_OPT_CLOSE_ON_FREE);
-	bufferevent_setcb(client_bev, ClientRead, NULL, ClientEvent, (void*)create_game);
+	int arg = ((start_client ? 1 : 0) << 1) | (create_duel ? 1 : 0);
+	bufferevent_setcb(client_bev, ClientRead, NULL, ClientEvent, (void*)arg);
 	temp_ip = ip;
 	temp_port = port;
-	if (bufferevent_socket_connect(client_bev, (sockaddr*)&sin, sizeof(sin)) < 0) {
+	if(bufferevent_socket_connect(client_bev, (sockaddr*)&sin, sizeof(sin)) < 0) {
 		bufferevent_free(client_bev);
 		event_base_free(client_base);
 		client_bev = 0;
@@ -63,14 +65,71 @@ bool DuelClient::StartClient(unsigned int ip, unsigned short port, bool create_g
 		return false;
 	}
 	connect_state = 0x1;
-	rnd.seed(time(0));
-	if(!create_game) {
-		timeval timeout = {5, 0};
-		event* resp_event = event_new(client_base, 0, EV_TIMEOUT, ConnectTimeout, 0);
-		event_add(resp_event, &timeout);
-	}
+	timeval timeout = { 5, 0 };
+	event* resp_event = event_new(client_base, 0, EV_TIMEOUT, ConnectTimeout, 0);
+	event_add(resp_event, &timeout);
 	std::thread(ClientThread).detach();
 	return true;
+}
+
+void DuelClient::StartClient(bool create_game) {
+	CTOS_PlayerInfo cspi;
+	BufferIO::CopyWStr(mainGame->ebNickName->getText(), cspi.name, 20);
+	SendPacketToServer(CTOS_PLAYER_INFO, cspi);
+	if(create_game) {
+		CTOS_CreateGame cscg;
+		BufferIO::CopyWStr(mainGame->ebServerName->getText(), cscg.name, 20);
+		BufferIO::CopyWStr(mainGame->ebServerPass->getText(), cscg.pass, 20);
+		cscg.info.rule = mainGame->cbRule->getSelected();
+		cscg.info.mode = mainGame->cbMatchMode->getSelected();
+		cscg.info.start_hand = _wtoi(mainGame->ebStartHand->getText());
+		cscg.info.start_lp = _wtoi(mainGame->ebStartLP->getText());
+		cscg.info.draw_count = _wtoi(mainGame->ebDrawCount->getText());
+		cscg.info.time_limit = _wtoi(mainGame->ebTimeLimit->getText());
+		cscg.info.lflist = mainGame->cbLFlist->getItemData(mainGame->cbLFlist->getSelected());
+		cscg.info.duel_rule = mainGame->GetMasterRule(mainGame->duel_param, mainGame->forbiddentypes);
+		cscg.info.duel_flag = mainGame->duel_param;
+		cscg.info.no_check_deck = mainGame->chkNoCheckDeck->isChecked();
+		cscg.info.no_shuffle_deck = mainGame->chkNoShuffleDeck->isChecked();
+		cscg.info.handshake = SERVER_HANDSHAKE;
+		if(cscg.info.mode == MODE_SINGLE) {
+			cscg.info.team1 = 1;
+			cscg.info.team2 = 1;
+			cscg.info.best_of = 0;
+		}
+		if(cscg.info.mode == MODE_MATCH) {
+			cscg.info.team1 = 1;
+			cscg.info.team2 = 1;
+			cscg.info.best_of = 3;
+		}
+		if(cscg.info.mode == MODE_TAG) {
+			cscg.info.team1 = 2;
+			cscg.info.team2 = 2;
+			cscg.info.best_of = 0;
+		}
+		if(cscg.info.mode == MODE_RELAY) {
+			cscg.info.team1 = 3;
+			cscg.info.team2 = 3;
+			cscg.info.best_of = 0;
+			cscg.info.duel_flag |= DUEL_RELAY_MODE;
+		}
+		cscg.info.forbiddentypes = mainGame->forbiddentypes;
+		cscg.info.extra_rules = mainGame->extra_rules;
+		SendPacketToServer(CTOS_CREATE_GAME, cscg);
+	} else {
+		CTOS_JoinGame csjg;
+		if(temp_ver)
+			csjg.version = temp_ver;
+		else
+			csjg.version = PRO_VERSION;
+		csjg.gameid = 0;
+		if(mainGame->is_online_hosting) {
+			BufferIO::CopyWStr(room_id, csjg.pass, 20);
+		} else {
+			BufferIO::CopyWStr(mainGame->ebJoinPass->getText(), csjg.pass, 20);
+		}
+		SendPacketToServer(CTOS_JOIN_GAME, csjg);
+	}
 }
 void DuelClient::ConnectTimeout(evutil_socket_t fd, short events, void* arg) {
 	if(connect_state == 0x7)
@@ -78,11 +137,21 @@ void DuelClient::ConnectTimeout(evutil_socket_t fd, short events, void* arg) {
 	if(!is_closing) {
 		temp_ver = 0;
 		mainGame->gMutex.lock();
-		mainGame->btnCreateHost->setEnabled(mainGame->coreloaded);
-		mainGame->btnJoinHost->setEnabled(true);
-		mainGame->btnJoinCancel->setEnabled(true);
-		if(!mainGame->wLanWindow->isVisible())
-			mainGame->ShowElement(mainGame->wLanWindow);
+		if(mainGame->is_online_hosting) {
+			mainGame->btnHostConfirm->setEnabled(true);
+			mainGame->btnOnlineRefresh->setEnabled(true);
+		} else {
+			mainGame->btnCreateHost->setEnabled(mainGame->coreloaded);
+			mainGame->btnJoinHost->setEnabled(true);
+			mainGame->btnJoinCancel->setEnabled(true);
+			if(mainGame->is_online_hosting) {
+				if(!mainGame->wOnlineWindow->isVisible())
+					mainGame->ShowElement(mainGame->wOnlineWindow);
+			} else {
+				if(!mainGame->wLanWindow->isVisible())
+					mainGame->ShowElement(mainGame->wLanWindow);
+			}
+		}
 		mainGame->PopupMessage(dataManager.GetSysString(1400));
 		mainGame->gMutex.unlock();
 	}
@@ -116,62 +185,15 @@ void DuelClient::ClientRead(bufferevent* bev, void* ctx) {
 }
 void DuelClient::ClientEvent(bufferevent *bev, short events, void *ctx) {
 	if (events & BEV_EVENT_CONNECTED) {
-		bool create_game = (size_t)ctx != 0;
-		CTOS_PlayerInfo cspi;
-		BufferIO::CopyWStr(mainGame->ebNickName->getText(), cspi.name, 20);
-		SendPacketToServer(CTOS_PLAYER_INFO, cspi);
-		if(create_game) {
-			CTOS_CreateGame cscg;
-			BufferIO::CopyWStr(mainGame->ebServerName->getText(), cscg.name, 20);
-			BufferIO::CopyWStr(mainGame->ebServerPass->getText(), cscg.pass, 20);
-			cscg.info.rule = mainGame->cbRule->getSelected();
-			cscg.info.mode = mainGame->cbMatchMode->getSelected();
-			cscg.info.start_hand = _wtoi(mainGame->ebStartHand->getText());
-			cscg.info.start_lp = _wtoi(mainGame->ebStartLP->getText());
-			cscg.info.draw_count = _wtoi(mainGame->ebDrawCount->getText());
-			cscg.info.time_limit = _wtoi(mainGame->ebTimeLimit->getText());
-			cscg.info.lflist = mainGame->cbLFlist->getItemData(mainGame->cbLFlist->getSelected());
-			cscg.info.duel_rule = mainGame->GetMasterRule(mainGame->duel_param, mainGame->forbiddentypes);
-			cscg.info.duel_flag = mainGame->duel_param;
-			cscg.info.no_check_deck = mainGame->chkNoCheckDeck->isChecked();
-			cscg.info.no_shuffle_deck = mainGame->chkNoShuffleDeck->isChecked();
-			cscg.info.handshake = SERVER_HANDSHAKE;
-			if(cscg.info.mode == MODE_SINGLE) {
-				cscg.info.team1 = 1;
-				cscg.info.team2 = 1;
-				cscg.info.best_of = 0;
-			}
-			if(cscg.info.mode == MODE_MATCH) {
-				cscg.info.team1 = 1;
-				cscg.info.team2 = 1;
-				cscg.info.best_of = 3;
-			}
-			if(cscg.info.mode == MODE_TAG) {
-				cscg.info.team1 = 2;
-				cscg.info.team2 = 2;
-				cscg.info.best_of = 0;
-			}
-			if(cscg.info.mode == MODE_RELAY) {
-				cscg.info.team1 = 3;
-				cscg.info.team2 = 3;
-				cscg.info.best_of = 0;
-				cscg.info.duel_flag |= DUEL_RELAY_MODE;
-			}
-			cscg.info.forbiddentypes = mainGame->forbiddentypes;
-			cscg.info.extra_rules = mainGame->extra_rules;
-			SendPacketToServer(CTOS_CREATE_GAME, cscg);
-		} else {
-			CTOS_JoinGame csjg;
-			if (temp_ver)
-				csjg.version = temp_ver;
-			else
-				csjg.version = PRO_VERSION;
-			csjg.gameid = 0;
-			BufferIO::CopyWStr(mainGame->ebJoinPass->getText(), csjg.pass, 20);
-			SendPacketToServer(CTOS_JOIN_GAME, csjg);
-		}
-		bufferevent_enable(bev, EV_READ);
+		bool create_game = (int)ctx & 1;
+		bool start_client = (int)ctx & 2;
 		connect_state |= 0x2;
+		if(start_client) {
+			StartClient(create_game);
+		} else
+			connect_state |= 0x4;
+		//mainGame->btnServerConnect->setEnabled(true);
+		bufferevent_enable(bev, EV_READ);
 	} else if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
 		bufferevent_disable(bev, EV_READ);
 		if(!is_closing) {
@@ -567,8 +589,10 @@ void DuelClient::HandleSTOCPacketLan(char* data, unsigned int len) {
 		}
 		if(mainGame->wCreateHost->isVisible())
 			mainGame->HideElement(mainGame->wCreateHost);
-		else if (mainGame->wLanWindow->isVisible())
+		if (mainGame->wLanWindow->isVisible())
 			mainGame->HideElement(mainGame->wLanWindow);
+		if (mainGame->wOnlineWindow->isVisible())
+			mainGame->HideElement(mainGame->wOnlineWindow);
 		mainGame->ShowElement(mainGame->wHostPrepare);
 		if(str2.size())
 			mainGame->ShowElement(mainGame->wHostPrepare2);
@@ -839,6 +863,57 @@ void DuelClient::HandleSTOCPacketLan(char* data, unsigned int len) {
 			mainGame->dField.RefreshAllCards();
 			mainGame->gMutex.unlock();
 		}
+		break;
+	}
+	case STOC_SERVER_INFO: {
+		STOC_ServerInfo pHP;
+		pHP.FromRaw(pdata);
+		//HostPacket* pHP = (HostPacket*)buf;
+		if(!is_closing && pHP.identifier == NETWORK_SERVER_ID) {
+			for(auto& game : pHP.hosts) {
+				HostPacket packet;
+				mainGame->gMutex.lock();
+				remotes.insert(game.duel_id);
+				packet.identifier = game.duel_id;
+				hosts.push_back(packet);
+				std::wstring hoststr;
+				hoststr.append(L"[");
+				hoststr.append(deckManager.GetLFListName(game.info.lflist));
+				hoststr.append(L"][");
+				hoststr.append(dataManager.GetSysString(game.info.rule + 1240));
+				hoststr.append(L"][");
+				hoststr.append(dataManager.GetSysString(game.info.mode + 1244));
+				hoststr.append(L"][");
+				hoststr.append(fmt::format(L"{:X}.0{:X}.{:X}", pHP.version >> 12, (pHP.version >> 4) & 0xff, pHP.version & 0xf));
+				hoststr.append(L"][");
+				int rule;
+				if(game.info.handshake == SERVER_HANDSHAKE) {
+					mainGame->GetMasterRule(game.info.duel_flag & ~DUEL_RELAY_MODE, game.info.forbiddentypes, &rule);
+				} else
+					rule = game.info.duel_rule;
+				if(rule == 5)
+					hoststr.append(L"Custom MR");
+				else
+					hoststr.append(fmt::format(L"MR {}", (rule == 0) ? 3 : rule));
+				hoststr.append(L"][");
+				if(game.info.draw_count == 1 && game.info.start_hand == 5 && game.info.start_lp == 8000
+				   && !game.info.no_check_deck && !game.info.no_shuffle_deck
+				   && rule == DEFAULT_DUEL_RULE && game.info.extra_rules == 0)
+					hoststr.append(dataManager.GetSysString(1280));
+				else hoststr.append(dataManager.GetSysString(1281));
+				hoststr.append(L"]");
+				wchar_t gamename[20];
+				BufferIO::CopyWStr(game.name, gamename, 20);
+				hoststr.append(gamename);
+				mainGame->lstOnlineHostList->addItem(hoststr.c_str());
+				mainGame->gMutex.unlock();
+			}
+		}
+		mainGame->gMutex.lock();
+		mainGame->btnOnlineRefresh->setEnabled(true);
+		mainGame->gMutex.unlock();
+		StopClient();
+		is_refreshing = false;
 		break;
 	}
 	}
@@ -3704,20 +3779,19 @@ void DuelClient::SendResponse() {
 	}
 }
 #undef READ_LUA64
-void DuelClient::BeginRefreshHost() {
+void DuelClient::BeginRefreshHost(unsigned int ip, unsigned short port) {
 	if(is_refreshing)
 		return;
 	is_refreshing = true;
-	mainGame->btnLanRefresh->setEnabled(false);
 	mainGame->lstHostList->clear();
+	mainGame->lstOnlineHostList->clear();
 	remotes.clear();
 	hosts.clear();
-	event_base* broadev = event_base_new();
-	char hname[256];
-	gethostname(hname, 256);
-	hostent* host = gethostbyname(hname);
-	if(!host)
+	if(connect_state) {
+		SendPacketToServer(CTOS_REQUEST_INFO);
 		return;
+	}
+	event_base* broadev = event_base_new();
 	SOCKET reply = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	BOOL opt = TRUE;
 	setsockopt(reply, SOL_SOCKET, SO_BROADCAST, (const char*)&opt, sizeof(BOOL));
@@ -3728,15 +3802,27 @@ void DuelClient::BeginRefreshHost() {
 	//send request
 	SOCKADDR_IN sockTo = {};
 	sockTo.sin_family = AF_INET;
-	sockTo.sin_port = htons(7911);
+	sockTo.sin_port = port;
 	HostRequest hReq;
 	hReq.identifier = NETWORK_CLIENT_ID;
-	for(int i = 0; i < 8; ++i) {
-		if(host->h_addr_list[i] == 0)
-			break;
-		unsigned int local_addr = *(unsigned int*)host->h_addr_list[i];
-		sockTo.sin_addr.s_addr = local_addr;
+	if(ip) {
+		sockTo.sin_addr.s_addr = htonl(ip);
 		sendto(reply, (const char*)&hReq, sizeof(HostRequest), 0, (sockaddr*)&sockTo, sizeof(sockaddr));
+		return;
+	} else {
+		char hname[256];
+		gethostname(hname, 256);
+		hostent* host = gethostbyname(hname);
+		if(!host)
+			return;
+		for(int i = 0; i < 8; ++i) {
+			if(host->h_addr_list[i] == 0)
+				break;
+			unsigned int local_addr = *(unsigned int*)host->h_addr_list[i];
+			sockTo.sin_addr.s_addr = local_addr;
+			printf("%u", sockTo.sin_addr.s_addr);
+			sendto(reply, (const char*)&hReq, sizeof(HostRequest), 0, (sockaddr*)&sockTo, sizeof(sockaddr));
+		}
 	}
 }
 int DuelClient::RefreshThread(event_base* broadev) {
@@ -3762,7 +3848,7 @@ void DuelClient::BroadcastReply(evutil_socket_t fd, short events, void * arg) {
 		/*int ret = */recvfrom(fd, buf, 256, 0, (sockaddr*)&bc_addr, &sz);
 		unsigned int ipaddr = bc_addr.sin_addr.s_addr;
 		HostPacket* pHP = (HostPacket*)buf;
-		if(!is_closing && pHP->identifier == NETWORK_SERVER_ID && remotes.find(ipaddr) == remotes.end() ) {
+		if(!is_closing && pHP->identifier == NETWORK_SERVER_ID && remotes.find(ipaddr) == remotes.end()) {
 			mainGame->gMutex.lock();
 			remotes.insert(ipaddr);
 			pHP->ipaddr = ipaddr;
@@ -3779,7 +3865,7 @@ void DuelClient::BroadcastReply(evutil_socket_t fd, short events, void * arg) {
 			hoststr.append(L"][");
 			int rule;
 			if(pHP->host.handshake == SERVER_HANDSHAKE) {
-				mainGame->GetMasterRule(pHP->host.duel_flag & ~DUEL_RELAY_MODE, pHP->host.forbiddentypes, &rule);
+				mainGame->GetMasterRule(pHP->host.duel_flag, pHP->host.forbiddentypes, &rule);
 			} else
 				rule = pHP->host.duel_rule;
 			if(rule == 5)
@@ -3788,8 +3874,8 @@ void DuelClient::BroadcastReply(evutil_socket_t fd, short events, void * arg) {
 				hoststr.append(fmt::format(L"MR {}", (rule == 0) ? 3 : rule));
 			hoststr.append(L"][");
 			if(pHP->host.draw_count == 1 && pHP->host.start_hand == 5 && pHP->host.start_lp == 8000
-			        && !pHP->host.no_check_deck && !pHP->host.no_shuffle_deck 
-					&& rule == DEFAULT_DUEL_RULE && pHP->host.extra_rules==0)
+			   && !pHP->host.no_check_deck && !pHP->host.no_shuffle_deck
+			   && rule == DEFAULT_DUEL_RULE && pHP->host.extra_rules == 0)
 				hoststr.append(dataManager.GetSysString(1280));
 			else hoststr.append(dataManager.GetSysString(1281));
 			hoststr.append(L"]");
@@ -3800,6 +3886,33 @@ void DuelClient::BroadcastReply(evutil_socket_t fd, short events, void * arg) {
 			mainGame->gMutex.unlock();
 		}
 	}
+}
+int DuelClient::ResolveServer(const std::wstring& servername, const std::wstring& _port) {
+	char ip[20];
+	BufferIO::CopyWStr(servername.c_str(), ip, 16);
+	unsigned int remote_addr = htonl(inet_addr(ip));
+	if(remote_addr == -1) {
+		char hostname[100];
+		char port[6];
+		BufferIO::CopyWStr(servername.c_str(), hostname, 100);
+		BufferIO::CopyWStr(_port.c_str(), port, 6);
+		struct evutil_addrinfo hints;
+		struct evutil_addrinfo *answer = NULL;
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+		hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
+		int status = evutil_getaddrinfo(hostname, port, &hints, &answer);
+		if(status != 0) {
+			return -1;
+		} else {
+			sockaddr_in * sin = ((struct sockaddr_in *)answer->ai_addr);
+			evutil_inet_ntop(AF_INET, &(sin->sin_addr), ip, 20);
+			remote_addr = htonl(inet_addr(ip));
+		}
+	}
+	return remote_addr;
 }
 void DuelClient::ReplayPrompt(bool need_header) {
 	if(need_header) {

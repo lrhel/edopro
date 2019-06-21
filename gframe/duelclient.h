@@ -37,8 +37,10 @@ public:
 	static unsigned short temp_port;
 	static unsigned short temp_ver;
 	static bool try_needed;
+	static unsigned short room_id[20];
 
-	static bool StartClient(unsigned int ip, unsigned short port, bool create_game = true);
+	static bool ConnectToServer(unsigned int ip, unsigned short port, bool start_client = false, bool create_duel = false);
+	static void StartClient(bool create_game = true);
 	static void ConnectTimeout(evutil_socket_t fd, short events, void* arg);
 	static void StopClient(bool is_exiting = false);
 	static void ClientRead(bufferevent* bev, void* ctx);
@@ -84,9 +86,10 @@ protected:
 	static std::set<unsigned int> remotes;
 public:
 	static std::vector<HostPacket> hosts;
-	static void BeginRefreshHost();
+	static void BeginRefreshHost(unsigned int ip = 0, unsigned short port = 7911);
 	static int RefreshThread(event_base* broadev);
 	static void BroadcastReply(evutil_socket_t fd, short events, void* arg);
+	static int ResolveServer(const std::wstring& servername, const std::wstring& port);
 };
 
 }
