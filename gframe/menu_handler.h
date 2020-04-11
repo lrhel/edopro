@@ -231,7 +231,8 @@ enum GUI {
 	CHECK_SHOW_LOCKED_ROOMS,
 	CHECK_SHOW_ACTIVE_ROOMS,
 	BUTTON_ROOMPASSWORD_CANCEL,
-	BUTTON_ONLINE_MULTIPLAYER // first button on main menu
+	BUTTON_ONLINE_MULTIPLAYER, // first button on main menu
+	BUTTON_ONLINE_RANKED //ranked button
 };
 
 }

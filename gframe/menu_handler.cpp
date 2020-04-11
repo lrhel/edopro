@@ -134,6 +134,11 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 				mainGame->ShowElement(mainGame->wRoomListPlaceholder);
 				break;
 			}
+			case BUTTON_ONLINE_RANKED: {
+				mainGame->isHostingRanked = true;
+				
+				break;
+			}
 			case BUTTON_LAN_REFRESH2: {
 				ServerLobby::RefreshRooms();
 				break;

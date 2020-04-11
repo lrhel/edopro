@@ -193,6 +193,8 @@ void DiscordWrapper::OnReady(const DiscordUser* connectedUser, void* payload) {
 	std::cout << "ready at " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
 	std::cout << "ready at (ms) " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
 	static_cast<ygo::Game*>(payload)->discord.connected = true;
+	ygo::mainGame->btnOnlineRanked->setEnabled(true);
+
 }
 
 void DiscordWrapper::OnDisconnected(int errcode, const char* message, void* payload) {
@@ -200,6 +202,8 @@ void DiscordWrapper::OnDisconnected(int errcode, const char* message, void* payl
 		   errcode,
 		   message);
 	static_cast<ygo::Game*>(payload)->discord.connected = false;
+	//ygo::mainGame->btnOnlineRanked->setEnabled(false);
+
 }
 
 void DiscordWrapper::OnError(int errcode, const char * message, void* payload) {

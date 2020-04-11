@@ -371,6 +371,7 @@ public:
 	irr::gui::IGUIStaticText* stExpectedCoreVersion;
 	irr::gui::IGUIStaticText* stCompatVersion;
 	irr::gui::IGUIButton* btnOnlineMode;
+	irr::gui::IGUIButton* btnOnlineRanked;
 	irr::gui::IGUIButton* btnLanMode;
 	irr::gui::IGUIButton* btnSingleMode;
 	irr::gui::IGUIButton* btnReplayMode;
@@ -660,6 +661,9 @@ public:
 	irr::gui::IGUIButton* btnJoinHost2;
 	irr::gui::IGUIButton* btnJoinCancel2;
 	irr::gui::IGUIStaticText* fpsCounter;
+
+	//ranked lobby
+	bool isHostingRanked;
 
 #ifdef __ANDROID__
 	int glversion;

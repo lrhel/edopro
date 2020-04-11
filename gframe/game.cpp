@@ -287,13 +287,16 @@ bool Game::Initialize() {
 	int mainMenuWidth = std::max(280, static_cast<int>(titleWidth / dpi_scale + 15));
 	mainMenuLeftX = 510 - mainMenuWidth / 2;
 	mainMenuRightX = 510 + mainMenuWidth / 2;
-	wMainMenu = env->addWindow(Scale(mainMenuLeftX, 200, mainMenuRightX, 450), false, formatVersion().c_str());
+	wMainMenu = env->addWindow(Scale(mainMenuLeftX, 200, mainMenuRightX, 485), false, formatVersion().c_str());
 	wMainMenu->getCloseButton()->setVisible(false);
 	//wMainMenu->setVisible(!is_from_discord);
 #define OFFSET(x1, y1, x2, y2) Scale(10, 30 + offset, mainMenuWidth - 10, 60 + offset)
 	int offset = 0;
 	btnOnlineMode = env->addButton(OFFSET(10, 30, 270, 60), wMainMenu, BUTTON_ONLINE_MULTIPLAYER, gDataManager->GetSysString(2042).c_str());
 	defaultStrings.emplace_back(btnOnlineMode, 2042);
+	offset += 35;
+	btnOnlineRanked = env->addButton(OFFSET(10, 30, 270, 60), wMainMenu, BUTTON_ONLINE_RANKED, gDataManager->GetSysString(2300).c_str());
+	defaultStrings.emplace_back(btnOnlineRanked, 2300);
 	offset += 35;
 	btnLanMode = env->addButton(OFFSET(10, 30, 270, 60), wMainMenu, BUTTON_LAN_MODE, gDataManager->GetSysString(1200).c_str());
 	defaultStrings.emplace_back(btnLanMode, 1200);
@@ -312,6 +315,7 @@ bool Game::Initialize() {
 	offset += 35;
 #undef OFFSET
 	btnSingleMode->setEnabled(coreloaded);
+	btnOnlineRanked->setEnabled(false);
 	//lan mode
 	wLanWindow = env->addWindow(Scale(220, 100, 800, 520), false, gDataManager->GetSysString(1200).c_str());
 	defaultStrings.emplace_back(wLanWindow, 1200);
@@ -2799,7 +2803,7 @@ void Game::ReloadElementsStrings() {
 }
 void Game::OnResize() {
 	wRoomListPlaceholder->setRelativePosition(recti(0, 0, mainGame->window_size.Width, mainGame->window_size.Height));
-	wMainMenu->setRelativePosition(ResizeWin(mainMenuLeftX, 200, mainMenuRightX, 450));
+	wMainMenu->setRelativePosition(ResizeWin(mainMenuLeftX, 200, mainMenuRightX, 485));
 	wBtnSettings->setRelativePosition(ResizeWin(0, 610, 30, 640));
 	SetCentered(wCommitsLog);
 	wDeckEdit->setRelativePosition(Resize(309, 8, 605, 130));
