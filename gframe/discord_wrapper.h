@@ -30,6 +30,8 @@ public:
 	bool Initialize(path_string workingDir);
 	void UpdatePresence(PresenceType type);
 	bool connected;
+	char* userId;
+    char* username;
 	void Check();
 private:
 	static void Connect();

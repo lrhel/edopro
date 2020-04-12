@@ -664,6 +664,11 @@ public:
 
 	//ranked lobby
 	bool isHostingRanked;
+	irr::gui::IGUIWindow* wRoomRanking;
+	irr::gui::IGUIButton* btnRankingExit;
+	irr::gui::IGUIComboBox* cbDeckSelectRanked;
+	irr::gui::IGUIStaticText* stDeckSelectRanked;
+
 
 #ifdef __ANDROID__
 	int glversion;

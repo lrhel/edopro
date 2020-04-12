@@ -1456,6 +1456,14 @@ bool Game::Initialize() {
 	env->getRootGUIElement()->bringToFront(wBtnSettings);
 	env->getRootGUIElement()->bringToFront(mTopMenu);
 	env->setFocus(wMainMenu);
+
+	//ranked
+	wRoomRanking = env->addWindow(Scale(50, 100, 1000, 600), false, gDataManager->GetSysString(2301).c_str());
+	wRoomRanking->setVisible(false);
+	wRoomRanking->getCloseButton()->setVisible(false);
+	btnRankingExit = env->addButton(Scale(60, 440, 140, 475), wRoomRanking, BUTTON_RANKED_EXIT, gDataManager->GetSysString(2302).c_str());
+	cbDeckSelectRanked = ADDComboBox(Scale(60, 230, 270, 255), wRoomRanking);
+
 #ifdef YGOPRO_BUILD_DLL
 	if(!coreloaded) {
 		stMessage->setText(gDataManager->GetSysString(1430).c_str());

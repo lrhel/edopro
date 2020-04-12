@@ -12,7 +12,7 @@
 #include <IGUIWindow.h>
 #include <IGUIStaticText.h>
 #include "discord_register.h"
-#include "discord_rpc.h"
+#include "discord_wrapper.h"
 #include "game.h"
 #include "duelclient.h"
 #include "logging.h"
@@ -25,6 +25,7 @@ DiscordWrapper::DiscordWrapper(): connected(false){
 bool DiscordWrapper::Initialize(path_string workingDir) {
 #ifdef DISCORD_APP_ID
 #if defined(_WIN32) || defined(__linux__)
+
 #ifdef _WIN32
 	TCHAR exepath[MAX_PATH];
 	GetModuleFileName(nullptr, exepath, MAX_PATH);
@@ -193,6 +194,8 @@ void DiscordWrapper::OnReady(const DiscordUser* connectedUser, void* payload) {
 	std::cout << "ready at " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
 	std::cout << "ready at (ms) " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
 	static_cast<ygo::Game*>(payload)->discord.connected = true;
+	static_cast<ygo::Game*>(payload)->discord.userId = connectedUser->userId;
+	static_cast<ygo::Game*>(payload)->discord.username = connectedUser->username;
 	ygo::mainGame->btnOnlineRanked->setEnabled(true);
 
 }

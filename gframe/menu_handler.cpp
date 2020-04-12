@@ -136,7 +136,14 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 			}
 			case BUTTON_ONLINE_RANKED: {
 				mainGame->isHostingRanked = true;
-				
+				mainGame->HideElement(mainGame->wMainMenu);
+				mainGame->ShowElement(mainGame->wRoomRanking);
+				break;
+			}
+			case BUTTON_RANKED_EXIT: {
+				mainGame->isHostingRanked = false;
+				mainGame->HideElement(mainGame->wRoomRanking);
+				mainGame->ShowElement(mainGame->wMainMenu);
 				break;
 			}
 			case BUTTON_LAN_REFRESH2: {
