@@ -12,7 +12,7 @@
 #include <IGUIWindow.h>
 #include <IGUIStaticText.h>
 #include "discord_register.h"
-#include "discord_wrapper.h"
+#include "discord_rpc.h"
 #include "game.h"
 #include "duelclient.h"
 #include "logging.h"
